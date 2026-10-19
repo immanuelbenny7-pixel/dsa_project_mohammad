@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pump Shift: Fuel Station Simulator</title>
+  <meta name="description" content="A 3D playable fuel station simulator game demonstrating Queue (FIFO), Stack (LIFO), Hash Map, and Array data structures.">
+  <link rel="stylesheet" href="style.css">
+  <!-- Load Three.js locally for instant offline execution, fallback to CDN if needed -->
+  <script src="three.min.js"></script>
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- TITLE / WELCOME SCREEN -->
+  <div id="screen-title" class="title-overlay">
+    <div class="title-card">
+      <div class="station-brand-badge">⛽ PETROL EXPRESS CO.</div>
+      <h1 class="game-title">PUMP SHIFT</h1>
+      <p class="game-subtitle">Fuel Station Simulator & DSA Engine</p>
+
+      <div class="title-features">
+        <div class="feature-pill">🏎️ 3D Low-Poly Station</div>
+        <div class="feature-pill">📋 FIFO Customer Queue</div>
+        <div class="feature-pill">↩️ LIFO Transaction Undo</div>
+        <div class="feature-pill">⚡ O(1) Fuel Hash Map</div>
+        <div class="feature-pill">📊 Daily Sales Array</div>
+        <div class="feature-pill">🔗 Singly Linked List: Receipt Chain</div>
+      </div>
+
+      <div class="title-actions">
+        <button id="btn-start-shift" class="btn btn-primary btn-large">
+          <span>🚀 START SHIFT</span>
+        </button>
+        <div class="title-secondary-btns">
+          <button id="btn-title-dsa" class="btn btn-secondary">📚 DSA Guide</button>
+          <button id="btn-title-controls" class="btn btn-secondary">🎮 How to Play</button>
+        </div>
+      </div>
+      <div class="version-tag">Desktop WebGL • v1.0 • Ready to Play</div>
+    </div>
+  </div>
+
+  <!-- IN-GAME HEADS UP DISPLAY (HUD) -->
+  <div id="hud" class="hud-overlay hidden">
+    <!-- First Person Crosshair & Interaction Prompt -->
+    <div id="crosshair-wrapper" class="crosshair-wrapper">
+      <div class="crosshair-reticle">
+        <div class="crosshair-dot"></div>
+        <div class="crosshair-circle"></div>
+      </div>
+      <div id="crosshair-prompt" class="crosshair-prompt hidden">
+        <span class="prompt-key">[E]</span>
+        <span id="crosshair-prompt-text" class="prompt-text">Interact</span>
+      </div>
+      <div id="fp-hint" class="fp-hint">
+        🖱️ Click screen to lock mouse look • [Esc] Unlock cursor • [V] Toggle camera view • [T] Tamil Voice
+      </div>
+    </div>
+
+    <!-- Tamil Interactive Speech Bubble Overlay -->
+    <div id="tamil-speech-bubble" class="tamil-speech-bubble hidden">
+      <div class="speech-avatar" id="tamil-avatar">🚗</div>
+      <div class="speech-body">
+        <div class="speech-header">
+          <span class="speech-speaker" id="tamil-speaker">CUSTOMER (வாடிக்கையாளர்)</span>
+          <span class="speech-audio-tag">🔊 TAMIL VOICE</span>
+        </div>
+        <div class="speech-tamil" id="tamil-text">வணக்கம்! ரெகுலர் 25 லிட்டர் போடுங்க தம்பி!</div>
+        <div class="speech-phonetic" id="tamil-phonetic">"Vanakkam! Regular 25 litre podunga thambi!"</div>
+        <div class="speech-translation" id="tamil-translation">(Hello! Fill 25 litres Regular please!)</div>
+      </div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="hud-header">
+      <div class="hud-brand">
+        <div class="brand-icon">⛽</div>
+        <div class="brand-info">
+          <span class="station-name">PUMP SHIFT #402</span>
+          <span class="status-indicator">● LIVE SHIFT</span>
+        </div>
+      </div>
+
+      <div class="hud-stats-group">
+        <div class="hud-stat-box" title="Current Cash Balance">
+          <span class="lbl">CASH</span>
+          <span id="hud-cash" class="val text-success">₹0.00</span>
+        </div>
+
+        <div class="hud-stat-box" title="Shift Timer">
+          <span class="lbl">SHIFT TIME</span>
+          <span id="hud-timer" class="val text-warning">3:00</span>
+        </div>
+
+        <div class="hud-stat-box" title="Served Customers (Target: 10)">
+          <span class="lbl">SERVED</span>
+          <span id="hud-customers" class="val">0 / 10</span>
+        </div>
+
+        <div class="hud-stat-box" title="Customer Satisfaction Rating">
+          <span class="lbl">SATISFACTION</span>
+          <span id="hud-satisfaction" class="val good">100%</span>
+        </div>
+
+        <div class="hud-stat-box" title="Mistakes Logged">
+          <span class="lbl">MISTAKES</span>
+          <span id="hud-mistakes" class="val text-danger">0</span>
+        </div>
+      </div>
+
+      <div class="hud-controls-group">
+        <button id="btn-finish-point" class="btn btn-hud btn-finish-glow hidden" title="Finish Point: Calculate total shift revenue at Station Computer [E]">
+          🏁 Finish Point [E]
+        </button>
+        <button id="btn-toggle-tamil" class="btn btn-hud" title="Toggle Tamil Voice Interactions (தமிழ் குரல்) [T]">
+          🗣️ தமிழ்: ON [T]
+        </button>
+        <button id="btn-toggle-camera" class="btn btn-hud" title="Toggle First Person / Third Person View [V]">
+          🎥 1st Person [V]
+        </button>
+        <button id="btn-open-terminal" class="btn btn-hud" title="Open Station Computer (Hash Map & Stack)">
+          🖥️ Terminal
+        </button>
+        <button id="btn-open-dsa" class="btn btn-hud" title="In-Game DSA Explanation">
+          📚 DSA Guide
+        </button>
+        <button id="btn-open-controls" class="btn btn-hud" title="View Keybindings & Instructions">
+          ⚙️ Help
+        </button>
+        <button id="btn-mute" class="btn btn-hud btn-icon" title="Toggle Sound Mute">
+          <span id="mute-icon">🔊</span>
+        </button>
+        <button id="btn-pause" class="btn btn-hud btn-icon" title="Pause Game [Esc]">
+          ⏸️
+        </button>
+      </div>
+    </header>
+
+    <!-- FINISH POINT NOTIFICATION BANNER (Activates when 10 cars completed) -->
+    <div id="finish-point-banner" class="finish-point-banner hidden">
+      <div class="fp-banner-badge">🏁 SHIFT FINISH POINT ACTIVE</div>
+      <div class="fp-banner-text">
+        <strong>Target Reached: 10/10 Cars Completed!</strong> Walk inside the shop to the <strong>Station Computer</strong> to calculate shift total & finalize accounts!
+      </div>
+      <button id="btn-banner-computer" class="btn btn-primary btn-sm">🖥️ Open Computer [E]</button>
+    </div>
+
+    <!-- Left Sidebar: Customer Queue (FIFO) -->
+    <aside class="hud-queue-sidebar">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>📋 CUSTOMER QUEUE</span>
+          <span class="dsa-tag">Queue: FIFO — first in, first served.</span>
+        </div>
+      </div>
+      <div id="queue-items-container" class="queue-list">
+        <!-- Dynamically injected queue cards -->
+      </div>
+      <div class="queue-dsa-footnote">
+        <span>Queue.enqueue() at rear • Queue.dequeue() from front</span>
+      </div>
+    </aside>
+
+    <!-- Bottom Center / Right: Active Fuel Dispenser Panel -->
+    <main class="hud-dispenser-area">
+      <div id="dispenser-panel" class="dispenser-card glass-panel">
+        
+        <!-- State A: Empty (No Car at Pump) -->
+        <div id="dispenser-empty" class="dispenser-empty-state">
+          <div class="pulse-ring">⛽</div>
+          <h3>PUMP BAY AVAILABLE</h3>
+          <p>Awaiting next vehicle in the FIFO customer line...</p>
+        </div>
+
+        <!-- State B: Active Car Serving -->
+        <div id="dispenser-active" class="dispenser-active-state hidden">
+          <!-- Active Vehicle Info -->
+          <div class="active-order-header">
+            <div class="car-info">
+              <span class="order-badge">SERVICE POSITION</span>
+              <h3 id="order-car-id">CAR-101</h3>
+              <span id="order-car-model" class="car-subtext">Cherry Red SEDAN</span>
+            </div>
+            <div class="order-request-box">
+              <span class="order-req-label">CUSTOMER ORDER:</span>
+              <div class="order-req-values">
+                <span id="order-requested-fuel" class="badge badge-regular">Regular 87</span>
+                <span id="order-target-litres" class="order-litres-bold">25.0 L</span>
+              </div>
+              <span id="order-tank-cap" class="tank-cap">Max: 50.0 L</span>
+            </div>
+          </div>
+
+          <!-- Fuel Type Selection (Hash Map lookup) -->
+          <div class="fuel-selector-row">
+            <div class="selector-label">
+              <span>SELECT NOZZLE:</span>
+              <span class="key-hint">[Keys 1 - 3]</span>
+            </div>
+            <div class="fuel-buttons">
+              <button id="fuel-btn-regular" class="btn btn-fuel btn-fuel-regular active">
+                <span class="f-num">1</span>
+                <span class="f-name">Regular Petrol</span>
+                <span class="f-price">₹102.50/L</span>
+              </button>
+              <button id="fuel-btn-premium" class="btn btn-fuel btn-fuel-premium">
+                <span class="f-num">2</span>
+                <span class="f-name">Premium Speed</span>
+                <span class="f-price">₹112.00/L</span>
+              </button>
+              <button id="fuel-btn-diesel" class="btn btn-fuel btn-fuel-diesel">
+                <span class="f-num">3</span>
+                <span class="f-name">Diesel Bio</span>
+                <span class="f-price">₹94.00/L</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Mismatch Warning Banner -->
+          <div id="fuel-mismatch-warning" class="warning-banner hidden">
+            ⚠️ Fuel mismatch! Customer requested Regular!
+          </div>
+
+          <!-- Flow Meter LCD Display -->
+          <div class="dispenser-meters">
+            <div class="meter-box">
+              <span class="m-lbl">DELIVERED</span>
+              <span id="dispenser-delivered-litres" class="m-val">0.0 L</span>
+            </div>
+            <div class="meter-box">
+              <span class="m-lbl">TOTAL DUE</span>
+              <span id="dispenser-current-cost" class="m-val text-success">₹0.00</span>
+            </div>
+          </div>
+
+          <!-- Progress Fill Bar -->
+          <div class="dispenser-progress-track">
+            <div id="dispenser-progress-fill" class="dispenser-progress-fill" style="width: 0%;"></div>
+          </div>
+          <div id="dispenser-stock-info" class="stock-subtext">Dispenser Stock: 350 L</div>
+
+          <!-- Interaction Control Buttons -->
+          <div class="dispenser-action-row">
+            <button id="btn-connect-nozzle" class="btn btn-action" title="Connect nozzle to vehicle [E]">
+              🔌 Connect [E]
+            </button>
+
+            <button id="btn-pump-fuel" class="btn btn-action btn-pump" title="Hold to pump fuel [Hold Spacebar or Click]">
+              <span class="pump-icon">⛽</span>
+              <span class="pump-text">Pump [Space]</span>
+            </button>
+
+            <button id="btn-complete-sale" class="btn btn-action btn-pay" title="Take payment and record sale [E]">
+              💰 Collect [E]
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Undo Row (Stack LIFO) -->
+        <div class="undo-bar">
+          <button id="btn-undo-sale" class="btn btn-undo" disabled title="Reverses the most recent sale from the transaction stack [U]">
+            <span>↩️ Undo [U]</span>
+          </button>
+          <span class="undo-footnote">Stack LIFO (Undo)</span>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: STATION COMPUTER TERMINAL (Hash Map & Stack Inspector) -->
+  <div id="modal-terminal" class="modal-backdrop hidden">
+    <div class="modal-card modal-large glass-panel">
+      <div class="modal-header">
+        <div class="modal-title-with-badge">
+          <h2>🖥️ Station Computer & DSA Terminal</h2>
+          <span id="term-finish-indicator" class="finish-indicator-tag hidden">🏁 FINISH POINT ACTIVE: 10 CARS COMPLETED</span>
+        </div>
+        <button class="btn btn-icon modal-close" data-close="modal-terminal">✕</button>
+      </div>
+
+      <!-- DEDICATED FINISH POINT & REVENUE CALCULATOR (SINGLY LINKED LIST) -->
+      <div id="terminal-calculator-card" class="terminal-calc-card">
+        <div class="calc-card-header">
+          <div class="calc-title-group">
+            <div class="calc-main-title">
+              <span class="calc-icon">🧮</span>
+              <span>Shift Settlement & Revenue Calculator</span>
+            </div>
+            <span class="tag-algo-badge">Singly Linked List: O(N) Traversal & Sequential Accumulation</span>
+          </div>
+          <div id="calc-status-badge" class="calc-status-badge">
+            <span class="status-dot"></span>
+            <span id="calc-status-text">Awaiting Calculation</span>
+          </div>
+        </div>
+
+        <p class="calc-instruction-text">
+          Every completed vehicle receipt was dynamically appended to a <strong>Singly Linked List</strong> (<code>ReceiptLinkedList</code>).
+          Traverse the node pointers (<code>HEAD ➔ Node.next ➔ TAIL</code>) to accumulate and verify the total shift amount.
+        </p>
+
+        <!-- Horizontal Linked List Node Visualizer -->
+        <div class="ll-visualizer-container">
+          <div class="ll-visualizer-header">
+            <span>RECEIPT LINKED LIST POINTER CHAIN:</span>
+            <span id="ll-node-counter" class="ll-node-counter">0 Nodes in Chain</span>
+          </div>
+          <div id="ll-nodes-track" class="ll-nodes-track">
+            <!-- Dynamically populated linked list nodes: [HEAD] -> [Node 1] -> ... -> [null] -->
+          </div>
+        </div>
+
+        <!-- Calculator Digital Console & Actions -->
+        <div class="calc-console-grid">
+          <!-- Digital Meter Box -->
+          <div class="calc-digital-screen">
+            <div class="calc-screen-row">
+              <span class="cs-label">TRAVERSAL ACCUMULATOR:</span>
+              <span id="calc-display-amount" class="cs-value-glow">₹0.00</span>
+            </div>
+            <div class="calc-screen-sub">
+              <div>Litres Sum: <span id="calc-display-litres" class="text-info">0.0 L</span></div>
+              <div>Processed: <span id="calc-display-count">0 / 10 cars</span></div>
+              <div>Pointer: <code id="calc-display-ptr">HEAD</code></div>
+            </div>
+            <div id="calc-reconcile-msg" class="calc-reconcile-alert hidden">
+              ✅ Revenue Successfully Reconciled with Station Register!
+            </div>
+          </div>
+
+          <!-- Interactive Calculation Action Buttons -->
+          <div class="calc-action-panel">
+            <div class="calc-btn-row">
+              <button id="btn-run-calc" class="btn btn-primary btn-calc-main" title="Traverse linked list nodes with live animation and sound">
+                <span>⚡ Calculate Total Amount</span>
+              </button>
+              <button id="btn-step-calc" class="btn btn-secondary" title="Step through 1 node in the linked list">
+                <span>👣 Step Node</span>
+              </button>
+              <button id="btn-reset-calc" class="btn btn-secondary" title="Reset accumulator to head">
+                <span>🔄 Reset</span>
+              </button>
+            </div>
+
+            <button id="btn-finalize-shift" class="btn btn-success btn-large btn-finalize hidden" title="Submit verified total and open shift report card">
+              <span>🎉 Total Verified! Finalize Shift & Print Report ➜</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal-grid">
+        <!-- Panel 1: Fuel Hash Map Lookup -->
+        <div class="terminal-col">
+          <div class="terminal-panel-title">
+            <span>Fuel lookup — fuel type → price and stock</span>
+            <span class="tag-algo">O(1) Hash Map Lookup</span>
+          </div>
+          <p class="terminal-desc">Key: <code>fuelType</code> → Price, Stock & Octane specifications.</p>
+
+          <div class="fuel-terminal-list">
+            <!-- Regular -->
+            <div class="fuel-terminal-item">
+              <div class="ft-head">
+                <span class="badge badge-regular">Regular Petrol</span>
+                <span id="term-price-regular" class="ft-price">₹102.50/L</span>
+              </div>
+              <div class="ft-progress-track">
+                <div id="term-stock-bar-regular" class="ft-progress-fill fill-regular" style="width: 85%;"></div>
+              </div>
+              <div class="ft-foot">
+                <span id="term-stock-text-regular">350 / 400 L</span>
+                <button id="btn-restock-regular" class="btn btn-mini">+100L Refill</button>
+              </div>
+            </div>
+
+            <!-- Premium -->
+            <div class="fuel-terminal-item">
+              <div class="ft-head">
+                <span class="badge badge-premium">Premium Speed</span>
+                <span id="term-price-premium" class="ft-price">₹112.00/L</span>
+              </div>
+              <div class="ft-progress-track">
+                <div id="term-stock-bar-premium" class="ft-progress-fill fill-premium" style="width: 75%;"></div>
+              </div>
+              <div class="ft-foot">
+                <span id="term-stock-text-premium">280 / 300 L</span>
+                <button id="btn-restock-premium" class="btn btn-mini">+100L Refill</button>
+              </div>
+            </div>
+
+            <!-- Diesel -->
+            <div class="fuel-terminal-item">
+              <div class="ft-head">
+                <span class="badge badge-diesel">Diesel Bio</span>
+                <span id="term-price-diesel" class="ft-price">₹94.00/L</span>
+              </div>
+              <div class="ft-progress-track">
+                <div id="term-stock-bar-diesel" class="ft-progress-fill fill-diesel" style="width: 80%;"></div>
+              </div>
+              <div class="ft-foot">
+                <span id="term-stock-text-diesel">320 / 350 L</span>
+                <button id="btn-restock-diesel" class="btn btn-mini">+100L Refill</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Transaction Stack (LIFO) -->
+        <div class="terminal-col">
+          <div class="terminal-panel-title">
+            <span>Transaction Stack — latest sale on top</span>
+            <span class="tag-algo">LIFO: Top Sale Popped for Undo</span>
+          </div>
+          <p class="terminal-desc">Every sale is pushed onto the stack. Undo pops the top record.</p>
+
+          <div id="terminal-stack-list" class="stack-view-container">
+            <!-- Dynamically populated stack items -->
+          </div>
+        </div>
+
+        <!-- Panel 3: Daily Sales Array Summary -->
+        <div class="terminal-col">
+          <div class="terminal-panel-title">
+            <span>Daily sales list</span>
+            <span class="tag-algo">Array Ledger & Aggregation</span>
+          </div>
+          <p class="terminal-desc">Sequential log of completed sales. Aggregated on-demand.</p>
+
+          <div class="array-metrics-grid">
+            <div class="array-metric-card">
+              <span class="am-lbl">TOTAL REVENUE</span>
+              <span id="term-total-rev" class="am-val text-success">₹0.00</span>
+            </div>
+            <div class="array-metric-card">
+              <span class="am-lbl">TOTAL LITRES</span>
+              <span id="term-total-vol" class="am-val">0.0 L</span>
+            </div>
+            <div class="array-metric-card">
+              <span class="am-lbl">TRANSACTIONS</span>
+              <span id="term-active-count" class="am-val">0</span>
+            </div>
+            <div class="array-metric-card">
+              <span class="am-lbl">AVG TICKET</span>
+              <span id="term-avg-ticket" class="am-val">₹0.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close" data-close="modal-terminal">Close Terminal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IN-GAME DSA GUIDE -->
+  <div id="modal-dsa" class="modal-backdrop hidden">
+    <div class="modal-card modal-large glass-panel">
+      <div class="modal-header">
+        <h2>📚 Data Structures in "Pump Shift"</h2>
+        <button class="btn btn-icon modal-close" data-close="modal-dsa">✕</button>
+      </div>
+
+      <div class="dsa-guide-content">
+        <!-- 1. Queue -->
+        <div class="dsa-section-card">
+          <div class="dsa-sec-head">
+            <span class="dsa-number">1</span>
+            <h3>Queue — FIFO Customer Line</h3>
+            <span class="dsa-complexity">Enqueue: O(1) • Dequeue: O(1)</span>
+          </div>
+          <p>
+            Cars arriving at the station join the back of the waiting line and must be served in the order of their arrival.
+            A <strong>First-In, First-Out (FIFO)</strong> Queue guarantees fairness: the car waiting the longest at the front is always served next at the pump island.
+          </p>
+          <div class="dsa-code-snippet">
+            <code>customerQueue.enqueue(newCar);   // Car joins at rear (slot 4)</code><br>
+            <code>const servedCar = customerQueue.dequeue(); // Leaves front (slot 1)</code>
+          </div>
+        </div>
+
+        <!-- 2. Stack -->
+        <div class="dsa-section-card">
+          <div class="dsa-sec-head">
+            <span class="dsa-number">2</span>
+            <h3>Stack — Transaction History & Undo</h3>
+            <span class="dsa-complexity">Push: O(1) • Pop: O(1)</span>
+          </div>
+          <p>
+            When a transaction completes, it is pushed onto the transaction stack. A <strong>Last-In, First-Out (LIFO)</strong>
+            Stack ensures that when the attendant needs to reverse an accidental or incorrect sale, the <em>most recent transaction</em>
+            is popped first, rolling back the cash and restoring the exact litres of fuel dispensed.
+          </p>
+          <div class="dsa-code-snippet">
+            <code>transactionStack.push(sale);   // Record new payment on top</code><br>
+            <code>const lastSale = transactionStack.pop(); // Undo rolls back latest sale</code>
+          </div>
+        </div>
+
+        <!-- 3. Hash Map -->
+        <div class="dsa-section-card">
+          <div class="dsa-sec-head">
+            <span class="dsa-number">3</span>
+            <h3>Hash Map — Fuel Prices & Car Orders</h3>
+            <span class="dsa-complexity">Lookup: O(1) Constant Time</span>
+          </div>
+          <p>
+            Rather than searching through lists, fuel types (<code>regular</code>, <code>premium</code>, <code>diesel</code>)
+            and unique vehicle orders (e.g. <code>CAR-102</code>) are mapped via Hash Maps for instant $O(1)$ lookups.
+            This dynamically calculates prices and validates orders without hardcoding details into the interface.
+          </p>
+          <div class="dsa-code-snippet">
+            <code>const fuel = fuelHashMap.get('regular'); // Returns { price: 1.45, stock: 350 }</code><br>
+            <code>const order = carOrderMap.get('CAR-102'); // Returns { fuelType, targetLitres }</code>
+          </div>
+        </div>
+
+        <!-- 4. Array / List -->
+        <div class="dsa-section-card">
+          <div class="dsa-sec-head">
+            <span class="dsa-number">4</span>
+            <h3>Array / List — Daily Sales Analytical Report</h3>
+            <span class="dsa-complexity">Append: O(1) • Aggregation: O(N)</span>
+          </div>
+          <p>
+            Each validated sale is appended to the daily sales ledger. At the end of the shift, the system iterates through
+            this array to aggregate total revenue, calculate fuel volume breakdowns, determine the average ticket, and tally mistakes.
+            If a sale is undone via the stack, the matching array entry is reversed to maintain full financial audit integrity.
+          </p>
+        </div>
+
+        <!-- 5. Singly Linked List -->
+        <div class="dsa-section-card">
+          <div class="dsa-sec-head">
+            <span class="dsa-number">5</span>
+            <h3>Singly Linked List — Sequential Receipt Chain & Total Calculation</h3>
+            <span class="dsa-complexity">Append: O(1) • Sequential Sum: O(N)</span>
+          </div>
+          <p>
+            As each car completes service, a new <code>ReceiptNode</code> is chained to the tail of a <strong>Singly Linked List</strong>.
+            Unlike fixed arrays, a Linked List provides dynamic node allocation where each receipt node holds its transaction payload
+            and a reference (<code>.next</code>) to the subsequent car's receipt.
+            At the shift <strong>Finish Point (10 cars served)</strong>, the attendant opens the Station Computer and performs an
+            $O(N)$ pointer traversal from <code>HEAD</code> to <code>TAIL</code> to sum the total cash amount and verify the accounts!
+          </p>
+          <div class="dsa-code-snippet">
+            <code>receiptList.append(sale);  // Node added at tail in O(1) time</code><br>
+            <code>while (curr) { total += curr.total; curr = curr.next; } // O(N) settlement sum</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary modal-close" data-close="modal-dsa">Got It, Let's Play!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONTROLS & HOW TO PLAY -->
+  <div id="modal-controls" class="modal-backdrop hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <h2>🎮 Player Controls & Station Rules</h2>
+        <button class="btn btn-icon modal-close" data-close="modal-controls">✕</button>
+      </div>
+
+        <div class="control-row">
+          <span class="key-tag">Mouse Look</span>
+          <span class="action-desc">Click screen to lock mouse & look around (Esc to unlock)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">W A S D</span>
+          <span class="action-desc">Walk around station in First-Person</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">V</span>
+          <span class="action-desc">Toggle Camera View (1st-Person ↔ 3rd-Person Overview)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">E</span>
+          <span class="action-desc">Interact with Target (Connect Nozzle, Collect Sale, Terminal)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">1, 2, 3</span>
+          <span class="action-desc">Select Fuel (1: Regular, 2: Premium, 3: Diesel)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">Spacebar (Hold)</span>
+          <span class="action-desc">Pump fuel smoothly until target litres delivered</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">U</span>
+          <span class="action-desc">Undo last sale (pops from transaction stack)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">T</span>
+          <span class="action-desc">Toggle Tamil Voice Interactions (தமிழ் குரல் ON / OFF)</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">Escape</span>
+          <span class="action-desc">Pause shift & show settings</span>
+        </div>
+        <div class="control-row">
+          <span class="key-tag">HUD Buttons</span>
+          <span class="action-desc">All actions can also be clicked via on-screen buttons!</span>
+        </div>
+      </div>
+
+      <div class="rules-summary">
+        <h4>Shift Guidelines</h4>
+        <ul>
+          <li>Serve vehicles in the order of the FIFO queue.</li>
+          <li>Check the customer's requested fuel type carefully! Wrong fuel causes penalties.</li>
+          <li>Hold pump until requested litres are reached — it auto-stops when full.</li>
+          <li>Don't let waiting customers' patience hit 0% or they will walk out angrily.</li>
+        </ul>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close" data-close="modal-controls">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PAUSE -->
+  <div id="modal-pause" class="modal-backdrop hidden">
+    <div class="modal-card glass-panel text-center">
+      <h2>⏸️ SHIFT PAUSED</h2>
+      <p>Take a breath! The station is on hold.</p>
+      <div class="pause-actions">
+        <button id="btn-resume" class="btn btn-primary modal-close" data-close="modal-pause">▶️ Resume Shift</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: END OF SHIFT REPORT (Daily Sales List) -->
+  <div id="modal-report" class="modal-backdrop hidden">
+    <div class="modal-card modal-large glass-panel">
+      <div class="modal-header">
+        <div>
+          <h2>📊 Shift Performance & Daily Sales Report</h2>
+          <span class="report-sub">Daily sales list</span>
+        </div>
+      </div>
+
+      <div class="report-body">
+        <!-- Grade & Star Rating Banner -->
+        <div class="report-grade-card">
+          <div id="rep-rating-stars" class="stars-display">⭐⭐⭐⭐⭐</div>
+          <h3 id="rep-rating-grade">Senior Attendant (A Rank)</h3>
+          <p>Shift completed successfully! All data structures reconciled.</p>
+        </div>
+
+        <!-- Key Financial & Operational Metrics -->
+        <div class="report-metrics-grid">
+          <div class="rep-metric">
+            <span class="rm-lbl">TOTAL SALES REVENUE</span>
+            <span id="rep-total-sales" class="rm-val text-success">₹0.00</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">TOTAL LITRES PUMPED</span>
+            <span id="rep-total-litres" class="rm-val">0.0 L</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">CUSTOMERS SERVED</span>
+            <span id="rep-customers-served" class="rm-val">0</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">AVG TRANSACTION VALUE</span>
+            <span id="rep-avg-ticket" class="rm-val">₹0.00</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">CUSTOMER SATISFACTION</span>
+            <span id="rep-satisfaction" class="rm-val good">100%</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">MISTAKES RECORDED</span>
+            <span id="rep-mistakes" class="rm-val text-danger">0</span>
+          </div>
+          <div class="rep-metric">
+            <span class="rm-lbl">TRANSACTIONS UNDONE</span>
+            <span id="rep-undone" class="rm-val">0</span>
+          </div>
+        </div>
+
+        <!-- Fuel Breakdown Table -->
+        <div class="report-table-wrapper">
+          <h4>Sales Breakdown by Fuel Type</h4>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Fuel Type</th>
+                <th>Transactions</th>
+                <th>Volume Sold</th>
+                <th>Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody id="rep-breakdown-body">
+              <!-- Dynamically injected rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-play-again" class="btn btn-primary btn-large">🔄 Play Next Shift</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="toast-stack"></div>
+
+  <!-- Application Scripts -->
+  <script src="js/sound.js"></script>
+  <script src="js/tamil-voice.js"></script>
+  <script src="js/dsa.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

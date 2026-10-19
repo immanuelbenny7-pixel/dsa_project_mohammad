@@ -1,0 +1,510 @@
+================================================================================
+           PUMP SHIFT: FUEL STATION SIMULATOR - GAME SPECIFICATION
+       DETAILED PLANNING, DATA STRUCTURES (DSA) & GAMEPLAY MECHANISMS
+================================================================================
+Project Name   : Pump Shift: Fuel Station Simulator
+Target Platform: Desktop Web Browser (HTML5 / Three.js / Modern Vanilla JS & CSS)
+Academic Domain: Data Structures & Algorithms (DSA) Practical Implementation
+Author/Context : DSA Course Project & Interactive 3D Simulator
+Date           : October 2026
+================================================================================
+
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & GAME CONCEPT
+2. GAME ARCHITECTURE & SYSTEM DESIGN
+3. CORE DATA STRUCTURES & ALGORITHM ANALYSIS
+   3.1 FIFO Queue (Vehicle Traffic & Order Processing)
+   3.2 LIFO Stack (Transaction Ledger & Undo Mechanism)
+   3.3 Hash Map (Fuel Catalog & Car Order Registry)
+   3.4 Dynamic Array / Sequential List (Daily Sales & Audit Log)
+   3.5 Summary Table: Time & Space Complexities
+4. CORE GAMEPLAY MECHANISMS
+   4.1 Vehicle Arrival, Queueing & Departure Physics
+   4.2 First-Person Attendant Controller & Mouse-Look Raycasting
+   4.3 Precision Aim-to-Pump Fuel Target Mechanism
+   4.4 Dynamic 3D Spline Rubber Hose Simulation
+   4.5 Customer Patience, Satisfaction & Mistake Scoring
+   4.6 Fuel Dispensing, Stock Depletion & Inventory Management
+   4.7 LIFO Transaction Reversal (Undo) System
+   4.8 Procedural Audio Synthesis Engine (Web Audio API)
+5. SHIFT LIFECYCLE & GAME LOOP
+   5.1 Title & Shift Initiation
+   5.2 Active Shift Servicing Loop
+   5.3 Shift Conclusion & DSA Performance Report
+6. FILE STRUCTURE & CODEBASE WALKTHROUGH
+7. FUTURE EXTENSIONS & ROADMAP
+
+
+================================================================================
+1. EXECUTIVE SUMMARY & GAME CONCEPT
+================================================================================
+"Pump Shift: Fuel Station Simulator" is a 3D browser-based simulation game that
+places the player into the boots of a fuel station attendant working an active
+shift. Operating under time pressure and customer expectations, the player must:
+  - Direct and service incoming vehicles in strict FIFO order.
+  - Select the correct fuel type (Regular 87, Premium 93, Diesel Bio).
+  - Walk up to the vehicle, connect the fuel dispenser nozzle.
+  - Aim the nozzle crosshair directly at the car's fuel cap target ring.
+  - Pump the exact requested volume of fuel.
+  - Collect payments and issue digital receipts.
+  - Manage inventory, stock levels, customer satisfaction, and mistakes.
+  - Use a LIFO transaction stack to reverse mistakes if an erroneous charge occurs.
+
+The project demonstrates the practical application of fundamental computer 
+science Data Structures (Queues, Stacks, Hash Maps, and Dynamic Arrays) 
+seamlessly integrated into modern 3D graphics (Three.js WebGL) and responsive
+gameplay mechanics.
+
+
+================================================================================
+2. GAME ARCHITECTURE & SYSTEM DESIGN
+================================================================================
+The application is constructed purely using client-side web technologies with
+zero third-party framework overhead, enabling maximum performance, portability,
+and native browser compatibility.
+
+Architectural Modules:
+----------------------
+1. Presentation Layer (index.html, style.css):
+   - HUD Overlay: Top status bar, compact FIFO queue sidebar, minimized active
+     dispenser card, interactive crosshair reticle, context prompts, toast alerts.
+   - Modals: DSA Terminal inspector, Controls guide, End-of-shift report card.
+   - Glassmorphic styling with CSS custom properties, backdrop filters, and 
+     subtle micro-animations.
+
+2. 3D Graphics Engine (js/models.js, three.min.js):
+   - Three.js r128 WebGL renderer with PCF soft shadow maps and exponential fog.
+   - Procedural Low-Poly 3D Assets:
+     * Station canopy, asphalt ground, service bay yellow markings, shop building.
+     * Two fuel pump islands with LCD screens, holsters, and hoses.
+     * 5 Vehicle types (Sedan, SUV, Sports Car, Hatchback, Truck) with 8 distinct
+       color palettes, turning wheels, headlights, and animated fuel caps.
+     * Animated low-poly Attendant character with walk cycle and high-vis vest.
+     * First-person viewmodel (animated right arm, safety glove, and fuel nozzle).
+
+3. Data Structures Layer (js/dsa.js):
+   - Standalone, cleanly decoupled implementations of Queue, Stack, Hash Map,
+     and Dynamic Array with full invariant enforcement and event callbacks.
+
+4. Audio Synthesis Engine (js/sound.js):
+   - Web Audio API procedural sound synthesizer (synthesizes pumps, engines, 
+     horns, cash register chimes, and UI feedback without external audio files).
+
+5. Main Controller & Game Loop (js/game.js):
+   - Shift clock, requestAnimationFrame loop, delta time calculations.
+   - Input polling (WASD movement, mouse-look pointer lock, keyboard shortcuts).
+   - Raycasting hit-detection for 3D interactions and fuel cap aiming.
+   - Vehicle physics (acceleration, deceleration, queuing positions, departure).
+
+
+================================================================================
+3. CORE DATA STRUCTURES & ALGORITHM ANALYSIS
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1 FIFO QUEUE: VEHICLE TRAFFIC & ORDER PROCESSING (CustomerQueue)
+--------------------------------------------------------------------------------
+Purpose:
+  Models the physical car service lane where vehicles arrive sequentially and
+  must be serviced strictly in First-In, First-Out (FIFO) order.
+
+Real-World Analogy:
+  A single-lane gas station driveway where cars cannot jump over each other.
+
+Implementation Details:
+  - Class: `CustomerQueue`
+  - Internal Structure: Array of car records `[car0, car1, car2, ...]`.
+  - Operations:
+    * `enqueue(car)`: Adds an arriving vehicle to the tail (Slot 3 -> Slot 0).
+    * `dequeue()`: Removes and returns the serviced car at the head (Slot 0).
+    * `peek()`: Inspects the vehicle currently at the pump without removing it.
+    * `getPosition(carId)`: Returns the 1-based index (1 = at pump, 2 = 2nd in line).
+    * `removeCar(carId)`: O(n) removal triggered when an impatient customer walks out.
+
+Complexity:
+  - Enqueue: O(1) amortized
+  - Dequeue: O(n) for shift / O(1) with circular buffer or pointer
+  - Peek: O(1)
+  - Space: O(k) where k is the maximum queue capacity (fixed at 4 vehicles)
+
+State Invariant:
+  Only the vehicle at index 0 (Queue Position #1) is in the 'SERVING' state and
+  eligible to receive fuel from the dispenser.
+
+
+--------------------------------------------------------------------------------
+3.2 LIFO STACK: TRANSACTION LEDGER & UNDO SYSTEM (TransactionStack)
+--------------------------------------------------------------------------------
+Purpose:
+  Records every completed financial sale in Last-In, First-Out (LIFO) order,
+  empowering the attendant to immediately undo/reverse the most recent sale if a
+  mistake was made (e.g., wrong fuel dispensed or incorrect customer billing).
+
+Real-World Analogy:
+  A physical stack of paper receipts placed on an office receipt spindle.
+
+Implementation Details:
+  - Class: `TransactionStack`
+  - Internal Structure: Array storage acting as a stack with push/pop operations.
+  - Transaction Record Object:
+    {
+      id: "TX-5001",
+      carId: "CAR-101",
+      fuelType: "regular",
+      fuelName: "Regular 87",
+      litres: 24.5,
+      pricePerLitre: 1.45,
+      total: 35.53,
+      timestamp: "15:42:10",
+      satisfactionAtSale: 92
+    }
+  - Operations:
+    * `push(transaction)`: Pushes a completed sale onto the top of the stack.
+    * `pop()`: Removes and returns the most recent transaction to execute a refund.
+    * `peek()`: Views the top of the stack without popping.
+    * `isEmpty()`: Verifies if undo is currently possible.
+
+Complexity:
+  - Push: O(1)
+  - Pop: O(1)
+  - Peek: O(1)
+  - Space: O(N) where N is total transactions completed during the shift.
+
+Game Integration:
+  Pressing [U] or clicking "Undo Last Sale" triggers `undoLastSale()`. This pops
+  the transaction, refunds the money from `this.cash`, decrements `customersServed`,
+  restocks the dispensed fuel volume back into `FuelHashMap`, and logs an undo entry.
+
+
+--------------------------------------------------------------------------------
+3.3 HASH MAP: FUEL INVENTORY & ORDER REGISTRY (FuelHashMap / CarOrderMap)
+--------------------------------------------------------------------------------
+Purpose:
+  Provides instant O(1) key-value lookup, update, and retrieval for both fuel
+  dispenser inventories and active customer orders.
+
+1. Fuel Catalog & Inventory (`FuelHashMap`):
+   - Key: String fuel identifier ('regular', 'premium', 'diesel').
+   - Value:
+     {
+       name: "Regular 87",
+       octane: 87,
+       price: 1.45,
+       stock: 350.0,
+       capacity: 500.0,
+       color: "#38bdf8"
+     }
+   - Operations:
+     * `get(fuelType)`: Returns fuel specification in O(1) time.
+     * `dispense(fuelType, amount)`: Deducts stock during pumping; handles out-of-stock.
+     * `restock(fuelType, amount)`: Restores fuel tank levels via station terminal.
+
+2. Car Order Registry (`CarOrderMap`):
+   - Key: Unique vehicle string ID (e.g., "CAR-104").
+   - Value: Complete customer order specification, target litres, tank capacity,
+            and vehicle status.
+   - Operations:
+     * `setOrder(carId, orderData)`: O(1) registration on car arrival.
+     * `getOrder(carId)`: O(1) instant lookup when car reaches the pump.
+     * `removeOrder(carId)`: O(1) clean-up when car despawns past station exit.
+
+Complexity:
+  - Insert / Put: O(1) average
+  - Lookup / Get: O(1) average
+  - Delete / Remove: O(1) average
+  - Space: O(M) where M is fuel types (3) + active world cars (<= 4).
+
+
+--------------------------------------------------------------------------------
+3.4 DYNAMIC ARRAY / LIST: DAILY SALES AUDIT LOG (DailySalesList)
+--------------------------------------------------------------------------------
+Purpose:
+  Maintains an immutable chronological journal of all shift events, completed
+  sales, and administrative refunds for financial auditing and reporting.
+
+Implementation Details:
+  - Class: `DailySalesList`
+  - Operations:
+    * `append(tx)`: Records confirmed sales chronologically.
+    * `markRefunded(txId)`: Flags a sale as reversed after a Stack POP.
+    * `computeTotalRevenue()`: Linear reduction of net active revenue.
+    * `toArray()`: Exports data for report generation and terminal tables.
+
+Complexity:
+  - Append: O(1) amortized
+  - Traversal: O(N)
+
+
+--------------------------------------------------------------------------------
+3.5 SINGLY LINKED LIST: SEQUENTIAL RECEIPT CHAIN & FINISH POINT CALCULATION
+--------------------------------------------------------------------------------
+Purpose:
+  Maintains a dynamic sequential chain of vehicle receipts (`ReceiptNode` objects)
+  where each node stores transaction payload and points to the next completed car (`.next`).
+  At the shift Finish Point (10 cars completed), the attendant opens the Station
+  Computer in the shop and executes an O(N) sequential traversal from HEAD to TAIL
+  to compute and reconcile total shift revenue.
+
+Implementation Details:
+  - Class: `ReceiptLinkedList` (Nodes: `ReceiptNode`)
+  - Operations:
+    * `append(tx)`: O(1) tail insertion when a car payment is processed.
+    * `removeById(txId)`: O(N) node unlinking if an undo reversal occurs.
+    * `calculateTotal()`: O(N) sequential pointer traversal (`curr = curr.next`)
+      accumulating total dollars and litres with step-by-step audit trace.
+    * `toArray()`: Exports nodes for UI chain visualization in the terminal.
+
+Complexity:
+  - Append to Tail: O(1)
+  - Sequential Traversal & Sum: O(N)
+  - Space: O(N) where N is completed transactions.
+
+
+--------------------------------------------------------------------------------
+3.6 SUMMARY TABLE: DATA STRUCTURE COMPLEXITIES
+--------------------------------------------------------------------------------
++-------------------+--------------------+----------+----------+---------------+
+| Data Structure    | Primary Role       | Op 1     | Op 2     | Space Comp.   |
++-------------------+--------------------+----------+----------+---------------+
+| CustomerQueue     | Traffic Scheduling | Enqueue  | Dequeue  | O(K)          |
+| (FIFO Queue)      | & Service Order    | O(1)     | O(1)     | (K <= 4 cars) |
++-------------------+--------------------+----------+----------+---------------+
+| TransactionStack  | Financial Ledger   | Push     | Pop      | O(N)          |
+| (LIFO Stack)      | & Undo Mechanism   | O(1)     | O(1)     | (N sales)     |
++-------------------+--------------------+----------+----------+---------------+
+| FuelHashMap       | Dispenser Stock &  | Get      | Put      | O(1)          |
+| (Hash Map)        | Fuel Catalog       | O(1) avg | O(1) avg | (3 fuels)     |
++-------------------+--------------------+----------+----------+---------------+
+| CarOrderMap       | Fast Vehicle Order | Get      | Set      | O(K)          |
+| (Hash Map)        | Lookups            | O(1) avg | O(1) avg | (K <= 4 cars) |
++-------------------+--------------------+----------+----------+---------------+
+| DailySalesList    | Shift Summary &    | Append   | Traverse | O(N)          |
+| (Dynamic Array)   | Financial Audit    | O(1)     | O(N)     | (N sales)     |
++-------------------+--------------------+----------+----------+---------------+
+| ReceiptLinkedList | Receipt Chaining & | Append   | Traverse | O(N)          |
+| (Singly Linked)   | Computer Tally Sum | O(1)     | O(N)     | (N receipts)  |
++-------------------+--------------------+----------+----------+---------------+
+
+
+================================================================================
+4. CORE GAMEPLAY MECHANISMS
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 VEHICLE ARRIVAL, QUEUEING & DEPARTURE PHYSICS
+--------------------------------------------------------------------------------
+- Vehicles spawn along the entry road at Z = 28.0 (Lane X = -3.2).
+- The FIFO Queue assigns each car a target slot coordinate:
+    Slot 0 (Pump Island) : Z = 0.0
+    Slot 1 (2nd in line) : Z = 7.5
+    Slot 2 (3rd in line) : Z = 14.5
+    Slot 3 (4th in line) : Z = 21.5
+- Each frame, cars calculate the distance `distZ = position.z - targetZ`:
+    * While moving, wheels rotate in sync with velocity: `wheel.rotation.x -= step * 1.8`.
+    * A subtle sinusoidal chassis sway simulates suspension dynamics.
+    * Upon arrival at Z = 0.0, the car transitions from 'ARRIVING' to 'SERVING'.
+- Departing cars accelerate down the exit highway toward Z = -35.0, where they
+  are automatically removed from the scene and cleaned up from `CarOrderMap`.
+
+
+--------------------------------------------------------------------------------
+4.2 FIRST-PERSON ATTENDANT CONTROLLER & MOUSE-LOOK RAYCASTING
+--------------------------------------------------------------------------------
+- Camera System:
+  * First-Person Mode (Default): Eye level at Y = 1.7m, 65° FOV, rotation order 'YXZ'.
+  * Third-Person Mode [V]: Elevated station isometric view at (13, 11, 16).
+- Pointer Lock & Mouse Look:
+  * Clicking the game screen requests browser pointer lock.
+  * Mouse movement calculates delta yaw and pitch with clamped vertical view:
+      `fpPitch = clamp(fpPitch - deltaY * 0.0024, -1.38, 1.38)`
+- Attendant First-Person Viewmodel:
+  * When in first-person mode, the player character's third-person body parts are
+    culled to avoid clipping.
+  * A custom 3D viewmodel (right forearm, glove, dispenser nozzle, and rubber hose)
+    is parented directly to the camera with walking bob and pumping recoil vibration.
+
+
+--------------------------------------------------------------------------------
+4.3 PRECISION AIM-TO-PUMP FUEL TARGET MECHANISM
+--------------------------------------------------------------------------------
+To deliver an authentic, skill-based simulator experience rather than a generic
+click-to-fill UI:
+1. 3D Target Ring & Hitbox:
+   - Built on the side of the car facing the pump island (local +X, world X = -2.25).
+   - Composed of:
+     * Glowing neon-teal RingGeometry (radius 0.20 to 0.32) that visibly pulses.
+     * Invisible CircleGeometry (radius 0.36) with DoubleSide material for raycast tests.
+2. Real-Time Raycasting:
+   - Every frame, a Three.js Raycaster fires from the camera center (0, 0):
+       `raycaster.setFromCamera(screenCenter, camera)`
+   - Checks intersection against the active vehicle's `fuelCapHitMesh`.
+3. Visual & Interactive Feedback:
+   - Aim Missed: Ring remains neon teal; crosshair reticle is standard size.
+   - Aim Hit: Ring glows bright white (0xffffff); HUD reticle expands with an
+     animated pulsing teal aura (`.crosshair-reticle.fuel-cap-aimed`); HUD prompt reads:
+     "✅ Nozzle on cap! Hold [Space] or [Left Click] to pump".
+4. Strict Pumping Gating:
+   - In first-person mode, fuel flow will NOT begin unless `isFuelCapAimed === true`.
+   - If the player's aim drifts off the ring while pumping, fuel flow immediately stops
+     and a warning toast prompts the player to re-align their aim.
+
+
+--------------------------------------------------------------------------------
+4.4 DYNAMIC 3D SPLINE RUBBER HOSE SIMULATION
+--------------------------------------------------------------------------------
+- Constructed using a Three.js `CatmullRomCurve3` spline extruded into a `TubeGeometry`.
+- Three dynamic anchor control points:
+    Point 0 (Start) : Dispenser holster outlet (-0.65, 1.1, 0.0).
+    Point 1 (Sag)   : Midpoint with gravitational sag (`mid.y = min(y0, y2) - 0.5`).
+    Point 2 (End)   : Attendant's held nozzle OR vehicle fuel port anchor.
+- Every frame, the tube geometry is dynamically updated, providing realistic,
+  curving rubber hose physics as the attendant walks around the station.
+
+
+--------------------------------------------------------------------------------
+4.5 CUSTOMER PATIENCE, SATISFACTION & MISTAKE SCORING
+--------------------------------------------------------------------------------
+- Patience Degradation:
+  * Every vehicle in the FIFO queue has a patience rating (100.0% to 0.0%).
+  * Waiting cars decay at 0.9%/sec; the car at the pump decays at 0.4%/sec.
+  * If patience hits 0.0%, the customer honks their horn in frustration, abandons
+    the queue (FIFO walkout), and triggers a -12% station satisfaction penalty.
+- Mistake Penalties:
+  * Dispensing the wrong fuel type: Immediate -15% satisfaction penalty and
+    increment of the mistakes counter.
+  * Customer walkout: -12% satisfaction penalty.
+- Reward:
+  * Serving customers with >70% patience grants +3% satisfaction and faster tips.
+
+
+--------------------------------------------------------------------------------
+4.6 FUEL DISPENSING, STOCK DEPLETION & INVENTORY MANAGEMENT
+--------------------------------------------------------------------------------
+- Continuous Dispensing:
+  * Holding [Spacebar] or [Left Mouse Button] dispenses fuel at 6.0 Litres/sec.
+  * Real-time LCD counters display Delivered Litres and Current Due ($).
+  * Automatically shuts off when the exact requested volume is reached.
+- Stock Depletion:
+  * Each litre pumped reduces stock from `FuelHashMap`.
+  * If stock reaches 0 L, the dispenser clicks off with an "Out of Stock" alarm.
+  * The player can access the Station Computer Terminal [E] to order fuel tanker
+    restocks using earned cash.
+
+
+--------------------------------------------------------------------------------
+4.7 LIFO TRANSACTION REVERSAL (UNDO) SYSTEM
+--------------------------------------------------------------------------------
+- When a customer payment is finalized:
+    1. Transaction record is created.
+    2. Pushed to `TransactionStack` (LIFO).
+    3. Cash is added to the till.
+- If the attendant immediately realizes an error:
+    1. Press [U] or click "Undo [U]".
+    2. The top transaction is popped from `TransactionStack`.
+    3. Money is refunded (`this.cash -= saleCost`).
+    4. The pumped fuel volume is returned to station storage in `FuelHashMap`.
+    5. The sale in `DailySalesList` is flagged as 'REFUNDED'.
+
+
+--------------------------------------------------------------------------------
+4.8 PROCEDURAL AUDIO SYNTHESIS ENGINE (Web Audio API)
+--------------------------------------------------------------------------------
+All sound effects are synthetically produced in real-time via `AudioContext`:
+- Fuel Pumping: Band-pass filtered white noise creating liquid rushing sound.
+- Car Engine Arrival: Low-frequency sawtooth oscillator ramping from 40Hz to 85Hz.
+- Car Departure: Accelerating pitch envelope with engine rev harmonics.
+- Car Horns: Dual square wave oscillators (440Hz + 554Hz) for realistic dissonance.
+- Cash Chime: Dual high sine wave bells (1200Hz -> 1800Hz) with exponential decay.
+- UI Feedback: Subtle resonant high-frequency clicks and warning buzzers.
+
+
+--------------------------------------------------------------------------------
+4.9 TAMIL VOICE INTERACTION & DIALOGUE SYSTEM (Web Speech API)
+--------------------------------------------------------------------------------
+To provide cultural flavor and an immersive experience, the game includes full
+Tamil voice interactions for both customers and the fuel attendant:
+- Web Speech API Integration:
+  * Selects native Tamil voices (`ta-IN` / `ta` e.g., Microsoft Valluvar, Google தமிழ்).
+  * Automatically falls back to Indian regional phonetics if Tamil TTS is not
+    installed in the host operating system.
+- Floating Glassmorphic Speech Bubble:
+  * Animated dialog bubble displayed at top-center of HUD during interactions.
+  * Shows authentic Tamil script, phonetic English romanization, and English translation.
+- Interactive Dialogue Events:
+  * Car Arrival: Customers speak in Tamil requesting their desired fuel & litres
+    (e.g., "வணக்கம்! ரெகுலர் பெட்ரோல் 25 லிட்டர் போடுங்க தம்பி!").
+  * Nozzle Connect: Attendant confirms (e.g., "சரிங்க சார், மீட்டர் ஜீரோ பாத்துக்கோங்க!").
+  * Full Tank: Attendant announces completion and total bill in Tamil.
+  * Wrong Fuel: Customer shouts in Tamil ("யோவ்! என்ன தப்பான பெட்ரோல் போடுறீங்க?!").
+  * Payment & Departure: Customer thanks attendant ("ரொம்ப நன்றி தம்பி! வரேன்!").
+  * Impatient Walkout: Customer complains in Tamil before leaving.
+  * Refund Undo: Attendant apologizes and confirms the refund.
+- Controls & Toggles:
+  * Toggle button in HUD navbar and keyboard shortcut [T] to toggle Tamil voice ON/OFF.
+
+
+================================================================================
+5. SHIFT LIFECYCLE & GAME LOOP
+================================================================================
+
+5.1 Shift Initiation:
+  - Title Screen modal displays instructions, keybindings, and target shift goals
+    (Serve 10 customers within 180 seconds).
+  - Clicking "START SHIFT" initializes the Web Audio API, locks pointer controls,
+    and spawns the first vehicle into the queue.
+
+5.2 Active Shift Servicing Loop:
+  1. Car arrives at entry road and is enqueued into `CustomerQueue` (FIFO).
+  2. Car drives to Slot 0 (Pump Island), displays requested fuel type & volume.
+  3. Attendant walks to pump, selects nozzle (Keys 1, 2, or 3).
+  4. Attendant presses [E] to connect nozzle; rubber hose attaches to car.
+  5. Attendant aims crosshair at the glowing fuel cap ring.
+  6. Attendant holds [Space] or [Left Click] until tank reaches target litres.
+  7. Attendant presses [E] to collect payment; receipt is pushed to `TransactionStack`.
+  8. Serviced vehicle departs down highway; next vehicle in FIFO queue rolls up.
+
+5.3 Shift Conclusion & DSA Performance Report:
+  - Triggered when 10 customers are served OR the 180s timer reaches zero.
+  - Generates comprehensive end-of-shift report card displaying:
+    * Total Revenue Earned ($)
+    * Customers Serviced vs Walkouts
+    * Final Station Satisfaction Rating (%)
+    * Mistakes Committed & Undone Sales
+    * Detailed Data Structures Audit Log (Queue throughput, Stack pops, Hash Map lookups)
+
+
+================================================================================
+6. FILE STRUCTURE & CODEBASE WALKTHROUGH
+================================================================================
+
+Project Root Directory:
+  |-- index.html      : Semantic HTML5 structure, HUD panels, SVG icons, modals.
+  |-- style.css       : Complete glassmorphic UI design system, compact HUD layout.
+  |-- three.min.js    : Three.js r128 UMD WebGL library.
+  |-- server.ps1      : Embedded PowerShell HTTP server script (port 8080).
+  +-- js/
+      |-- dsa.js      : CustomerQueue, TransactionStack, FuelHashMap, DailySalesList.
+      |-- sound.js    : Web Audio API procedural sound synthesizer.
+      |-- models.js   : 3D station environment, low-poly vehicles, attendant, hose.
+      +-- game.js     : Main loop, raycasting aim, inputs, shift state management.
+
+
+================================================================================
+7. FUTURE EXTENSIONS & ROADMAP
+================================================================================
+1. Multi-Pump Island Scheduling (Priority Queues & Heaps):
+   - Scaling from 1 single-lane pump to 4 dual-sided pump bays using a Min-Heap
+     to schedule vehicles to the shortest bay queue.
+2. Fuel Delivery Tanker Simulation:
+   - Scheduling bulk deliveries using a Priority Queue based on lowest stock levels.
+3. Graph-Based Road Network (Dijkstra's Shortest Path):
+   - Expanding the station exterior to an interconnected city grid where cars route
+     to the fuel station based on shortest road network paths.
+4. Mobile & Gamepad Support:
+   - Dual-stick touch controls and WebXR immersive VR attendant mode.
+
+================================================================================
+                            END OF SPECIFICATION FILE
+================================================================================
